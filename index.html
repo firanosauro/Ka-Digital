@@ -1,0 +1,474 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <!-- Conexão com o Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+
+<!-- Importação da fonte Poppins -->
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Changa+One:ital@0;1&family=Montserrat:ital,wght@0,100..900;1,100..900&display=swap" rel="stylesheet">
+    <title>Ka Digital Informática</title>
+    <style>
+        * {
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Poppins', sans-serif;
+            margin: 0;
+            min-width: 320px;
+        }
+        
+        header {
+            background: rgb(12, 12, 12);
+            color: rgba(245, 245, 245, 0.973);
+        }
+        .logo {
+            display: flex;
+            text-align: center;
+            align-items: center;
+            justify-content: center;
+            gap: clamp(16px, 4vw, 50px);
+            padding: 8px 16px;
+        }
+        .logo img {
+            height: 100px;
+            width: auto;
+        }
+        .serviços p {
+            font-weight: 550;
+            font-family: 'Changa One', sans-serif;
+            font-size: 24px;
+            text-align: center;
+            margin: 0;
+            padding: 24px;
+            color: rgb(126, 0, 0);
+        }
+        .serviços {
+            background: linear-gradient(to bottom, rgb(12, 12, 12), rgb(32, 32, 32));
+        }
+        .logo h1 {
+            font-size: clamp(18px, 2.4vw, 24px);
+        }
+
+        .hero {
+            text-align: center;
+            padding-bottom: 12px;
+        }
+        .hero-actions {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            align-items: center;
+            gap: 12px;
+            padding: 0 16px;
+        }
+        .hero-content {
+            display: block;
+            max-width: 1200px;
+            margin: 16px auto 0;
+        }
+       
+        .persua {
+            max-width: 800px;
+            margin: 0 auto;
+            text-align: left;
+            padding: 10px 20px;
+        }
+       
+        .persua p {
+            max-width: 46ch;
+            margin: 0;
+            font-size: 16px;
+            line-height: 1.8;
+        }
+        
+        
+        .persua h2 {
+            margin-top: 0;
+            font-weight: 900;
+            font-size: clamp(24px, 4vw, 30px);
+            color: #ff4b57;
+            text-shadow: 0 2px 4px rgba(255, 38, 58, .38);
+            animation: brilho-titulo 3s infinite;
+        }
+        .cards {
+            display: flex;
+            flex-direction: row;
+            gap: 8px;
+            margin: 10px;
+        }
+        .cards img {
+            flex: 1;
+            min-width: 0;
+            width: 0;
+            height: 200px;
+            object-fit: cover;
+            border-radius: 10px;
+            border: 1px solid;
+            transition: transform 0.3s ease;
+        }
+        .cards img:hover {
+            transform: translateY(-5px) scale(1.05);
+        }
+        .botao {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            border: 1px solid #220101;
+            border-radius: 20px;
+            padding: 10px 16px;
+            width: min(200px, calc(100% - 32px));
+            margin: 16px auto;
+            background: linear-gradient(to right, rgb(104, 104, 104), black);
+            box-shadow: rgb(131, 0, 0) 3px 2px 1px;
+
+            transition: transform 0.3s ease;
+
+        }
+        .botao1 {
+
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            border: 1px solid #220101;
+            border-radius: 20px;
+            padding: 10px 16px;
+            width: min(200px, calc(100% - 32px));
+            margin: 16px auto;
+            background: linear-gradient(to right, rgb(93, 253, 1), rgb(255, 0, 0));
+            box-shadow: rgb(0, 119, 255) 3px 2px 1px;
+
+            transition: transform 0.3s ease;
+
+        }
+        .botao1 a {
+            text-decoration: none;
+            color: azure;
+            font-weight: 500;
+
+        }
+        .botao1 img {
+            height: 20px;
+            
+        }
+        .botao1:hover {
+            transform: translateY(-10px) scale(1.05);
+            box-shadow: 4px 3px 1px rgb(0, 217, 255);
+        }
+
+        .botao:hover {
+            transform: translateY(-10px) scale(1.05);
+            box-shadow: 4px 3px 1px red;
+        }
+        .botao a {
+            text-decoration: none;
+            color: azure;
+            font-weight: 500;
+
+        }
+        .botao img {
+            height: 20px;
+            
+        }
+        .serviços h3 {
+            font-size: small;
+            color: #fffdfea6;
+            text-align: center;
+            line-height: 1.6;
+            margin: 20px 16px 0;
+            padding-bottom: 20px;
+        }
+        
+        hr {
+            height: 2px;
+            border: none;
+            background-color: #ff4b57;
+            width: 50%;
+        }
+        .persua span {
+            color: #ff000073;
+            font-size: small;
+        }
+        .serviços span {
+            color: rgb(255, 187, 2);
+        }
+        .connection-cards {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(min(100%, 300px), 1fr));
+            gap: 16px;
+            width: min(860px, calc(100% - 32px));
+            margin: 28px auto;
+        }
+        .connection-card {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 12px;
+            padding: 20px;
+            color: #fff;
+            text-align: center;
+            background: linear-gradient(145deg, #c90000, #760000);
+            border: 1px solid rgba(255, 255, 255, .25);
+            border-radius: 16px;
+            box-shadow: 0 8px 20px rgba(0, 0, 0, .35);
+        }
+        .connection-card__heading {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            min-height: 44px;
+            margin: 0;
+            font-size: 1.5rem;
+        }
+        .connection-card__icon {
+            width: 38px;
+            height: 38px;
+            object-fit: contain;
+            filter: brightness(0) invert(1);
+        }
+        .connection-card__icon--pix {
+            width: 68px;
+            height: auto;
+        }
+        .connection-card__details {
+            width: 100%;
+            padding: 12px 10px;
+            background: rgba(255, 255, 255, .1);
+            border: 1px solid rgba(255, 255, 255, .2);
+            border-radius: 12px;
+        }
+        .connection-card__label {
+            display: block;
+            margin-bottom: 4px;
+            font-size: .82rem;
+            opacity: .8;
+        }
+        .connection-card__value {
+            display: block;
+            font-size: 1.05rem;
+            font-weight: 700;
+            overflow-wrap: anywhere;
+        }
+        .connection-card__hint,
+        .connection-card__status {
+            margin: 0;
+            font-size: .82rem;
+            line-height: 1.4;
+        }
+        .serviços .connection-card__hint,
+        .serviços .connection-card__status {
+            padding: 0;
+            color: rgba(255, 255, 255, .86);
+            font-family: 'Poppins', sans-serif;
+            font-size: .82rem;
+            font-weight: 400;
+            text-align: center;
+        }
+        .connection-card__status {
+            min-height: 1.2em;
+        }
+        .connection-card__copy {
+            width: 100%;
+            padding: 12px 16px;
+            color: #fff;
+            font: inherit;
+            font-weight: 600;
+            background: linear-gradient(135deg, #383838, #000);
+            border: 1px solid rgba(255, 255, 255, .2);
+            border-radius: 999px;
+            box-shadow: 0 5px 12px rgba(0, 0, 0, .28);
+            cursor: pointer;
+            transition: transform .2s ease, box-shadow .2s ease;
+        }
+        .connection-card__copy:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 16px rgba(0, 0, 0, .35);
+        }
+        .connection-card__copy:focus-visible {
+            outline: 2px solid #fff;
+            outline-offset: 3px;
+        }
+        @keyframes brilho-titulo {
+            0% {
+                text-shadow: 0 2px 4px rgba(255, 38, 58, .38);
+                color: #ff4b57;
+            }
+        
+            50% {
+                text-shadow: 0 2px 5px rgba(255, 81, 38, 0.72);
+                color: rgba(255, 85, 43, 0.72);
+                
+            }
+            75% {
+                text-shadow: 0 2px 4px rgba(255, 89, 38, 0.72);
+                color: rgba(250, 110, 75, 0.801);
+            }
+            100% {
+                text-shadow: 0 2px 4px rgba(255, 38, 58, .38);
+                color: #ff4b57;
+            }
+        }
+        
+        @media (max-width: 600px) {
+            .persua {
+                text-align: center;
+            }
+            .persua p {
+                margin: 0 auto;
+            }
+            .logo {
+                gap: 12px;
+            }
+            .logo img {
+                height: 64px;
+            }
+            .logo h1 {
+                font-size: 18px;
+            }
+            .hero-content {
+                margin-top: 8px;
+            }
+            .hero-actions {
+                flex-direction: column;
+                gap: 0;
+            }
+            .hero-actions .botao,
+            .hero-actions .botao1 {
+                margin: 8px auto;
+            }
+            .cards {
+                flex-direction: row;
+                gap: 5px;
+                margin: 10px;
+            }
+            .cards img {
+                width: 0;
+                height: 200px;
+                object-fit: contain;
+            }
+        }
+    </style>
+</head>
+<body>
+    <header class="hero">
+      <div class="logo" id="logo"> 
+          <img src="ka.png">
+          <h1>Ka Digital Informática</h1>
+        </div>
+        <div class="hero-content">
+          <div class="persua">
+            <h2>quem somos nós ?</h2>
+            <p>A Ka Digital Informática é sua parceira de confiança em Coronel Fabriciano, referência em tecnologia, entretenimento digital e soluções completas para o seu equipamento.<br> <span>entre em contato conosco clicando no botão abaixo</span></p>
+          </div>
+        </div>
+        <div class="hero-actions">
+        <div class="botao">
+            <img src="whatsapp-svgrepo-com.svg">
+            <a href="https://wa.me/553172515892">WhatsApp</a>
+        </div>
+        <div class="botao">
+            <img src="instagram-svgrepo-com.svg">
+            <a href="https://www.instagram.com/kadigital_informatica/">Instagram</a>
+        </div>
+
+        <div class="botao1">
+            <img src="google-color-svgrepo-com.svg">
+            <a href="https://maps.app.goo.gl/WbJ3M9pzCfkNKP2d9">avalie no Google</a>
+        </div>
+        </div>
+        
+    </header>
+   <section class="serviços">
+    <p>serviços</p>
+    
+    <hr>
+        <div class="cards">
+            <img src="sev1.webp">
+            <img src="sev2.webp">
+            <img src="sev3.webp">
+        </div>
+        
+     <p>setups</p>
+     <hr>
+        <div class="cards setup-cards">
+            <img src="set1.jpg">
+            <img src="set2.jpg">
+            <img src="set3.webp">
+        </div>
+        <h3>para mais serviços e setups olhe nossas <span>redes sociais</span> e nossa pagina no <span>Google maps!</span></h3>
+        <div class="connection-cards">
+          <article class="connection-card" aria-labelledby="wifi-title">
+            <h2 class="connection-card__heading" id="wifi-title">
+              <img class="connection-card__icon" src="wifi-svgrepo-com.svg" alt="">
+              Wi-Fi
+            </h2>
+            <div class="connection-card__details">
+              <span class="connection-card__label">Rede</span>
+              <span class="connection-card__value">KA DIGITAL</span>
+            </div>
+            <p class="connection-card__hint">Toque para copiar a senha do Wi-Fi:</p>
+            <button class="connection-card__copy" type="button" data-copy="pcgamer2022" data-success="Senha do Wi-Fi copiada!" aria-describedby="wifi-copy-status">
+              Copiar Senha do Wi-Fi
+            </button>
+            <p class="connection-card__status" id="wifi-copy-status" aria-live="polite"></p>
+          </article>
+          <article class="connection-card" aria-labelledby="pix-title">
+            <h2 class="connection-card__heading" id="pix-title">
+              <img class="connection-card__icon connection-card__icon--pix" src="pix.svg" alt="">
+              Pix
+            </h2>
+            <div class="connection-card__details">
+              <span class="connection-card__label">Chave CPF</span>
+              <span class="connection-card__value">104.114.276-52</span>
+            </div>
+            <button class="connection-card__copy" type="button" data-copy="10411427652" data-success="Chave Pix copiada!" aria-describedby="pix-copy-status">
+              Copiar Chave Pix
+            </button>
+            <p class="connection-card__status" id="pix-copy-status" aria-live="polite"></p>
+          </article>
+        </div>
+   </section>
+   <script>
+    document.addEventListener('click', async (event) => {
+      const button = event.target.closest('button[data-copy]');
+      if (!button) return;
+
+      const status = document.getElementById(button.getAttribute('aria-describedby'));
+      const value = button.dataset.copy;
+
+      try {
+        if (navigator.clipboard && window.isSecureContext) {
+          await navigator.clipboard.writeText(value);
+        } else {
+          const input = document.createElement('textarea');
+          input.value = value;
+          input.setAttribute('readonly', '');
+          input.style.position = 'fixed';
+          input.style.opacity = '0';
+          document.body.appendChild(input);
+          input.select();
+          const copied = document.execCommand('copy');
+          input.remove();
+          if (!copied) throw new Error('O navegador não conseguiu copiar o texto.');
+        }
+        status.textContent = button.dataset.success;
+      } catch (error) {
+        status.textContent = 'Não foi possível copiar. Tente novamente.';
+        console.error('Falha ao copiar o dado do cartão.', error);
+      }
+    });
+
+    window.alert('site desenvolvido para telemoveis, estamos trabalhando na adaptação para computadores e etc.')
+   </script>
+</body>
+</html>
