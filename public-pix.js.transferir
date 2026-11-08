@@ -1,0 +1,330 @@
+// Public link page: shared, cacheable behavior.
+(function () {
+  'use strict';
+  const cfg = JSON.parse(document.currentScript.dataset.config || '{}');
+const pixQrDefaultTitle = cfg.pix_qr_modal_title;
+    const pixQrCopyDefaultLabel = cfg.pix_qr_modal_copy_payload;
+    const pixQrCopyDoneLabel = cfg.pix_qr_modal_copy_done;
+    let pixQrDebounceTimer = null;
+    let pixQrCurrentPayload = '';
+    let pixQrCurrentContext = null;
+    let pixQrCopyResetTimer = null;
+    let pixQrRenderSequence = 0;
+
+    function getPixQrRefs() {
+      return {
+        modal: document.getElementById('pix-qr-modal'),
+        image: document.getElementById('pix-qr-image'),
+        title: document.getElementById('pix-qr-title'),
+        area: document.querySelector('#pix-qr-modal .pix-qr-area'),
+        loader: document.getElementById('pix-qr-loader'),
+        amountInput: document.getElementById('pix-qr-amount'),
+        copyBtn: document.getElementById('btn-copy-pix-payload'),
+        keyValue: document.getElementById('pix-qr-key-value'),
+        keyType: document.getElementById('pix-qr-key-type'),
+      };
+    }
+
+    function pixEmvField(id, value) {
+      const text = String(value);
+      return id + String(text.length).padStart(2, '0') + text;
+    }
+
+    function pixCrc16Ccitt(payload) {
+      let crc = 0xFFFF;
+      for (let c = 0; c < payload.length; c++) {
+        crc ^= payload.charCodeAt(c) << 8;
+        for (let i = 0; i < 8; i++) {
+          if (crc & 0x8000) {
+            crc = (crc << 1) ^ 0x1021;
+          } else {
+            crc <<= 1;
+          }
+          crc &= 0xFFFF;
+        }
+      }
+      return crc.toString(16).toUpperCase().padStart(4, '0');
+    }
+
+    function normalizePixKeyType(value) {
+      const v = String(value || '').trim().toLowerCase();
+      const map = {
+        auto: 'auto',
+        automatico: 'auto',
+        automatic: 'auto',
+        cpf: 'cpf',
+        cnpj: 'cnpj',
+        email: 'email',
+        mail: 'email',
+        telefone: 'telefone',
+        phone: 'telefone',
+        celular: 'telefone',
+        aleatoria: 'aleatoria',
+        aleatorio: 'aleatoria',
+        random: 'aleatoria',
+        evp: 'aleatoria',
+      };
+      return map[v] || 'auto';
+    }
+
+    function normalizePixKeyForPayload(rawKey, typeCode) {
+      const raw = String(rawKey || '').trim();
+      if (!raw) return '';
+      const normalizedType = normalizePixKeyType(typeCode);
+
+      if (normalizedType === 'telefone') {
+        let digits = raw.replace(/\D+/g, '');
+        if (!digits) return '';
+        if (digits.length === 10 || digits.length === 11) {
+          digits = '55' + digits;
+        }
+        if (!digits.startsWith('55')) {
+          digits = '55' + digits;
+        }
+        return '+' + digits;
+      }
+
+      if (normalizedType === 'email') {
+        return raw.replace(/\s+/g, '').toLowerCase();
+      }
+
+      if (normalizedType === 'cpf' || normalizedType === 'cnpj') {
+        return raw.replace(/\D+/g, '');
+      }
+
+      if (normalizedType === 'aleatoria') {
+        let clean = raw.toLowerCase().replace(/[{}\s]/g, '').replace(/[^a-z0-9-]/g, '');
+        if (/^[0-9a-f]{32}$/.test(clean)) {
+          clean = clean.slice(0, 8) + '-' + clean.slice(8, 12) + '-' + clean.slice(12, 16) + '-' + clean.slice(16, 20) + '-' + clean.slice(20);
+        }
+        return clean;
+      }
+
+      return raw;
+    }
+
+    function normalizePixMerchantText(value, maxLen, fallback) {
+      let text = String(value || '').trim();
+      if (!text) text = fallback;
+      if (typeof text.normalize === 'function') {
+        text = text.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+      }
+      text = text.toUpperCase().replace(/[^A-Z0-9 ]+/g, ' ').replace(/\s+/g, ' ').trim();
+      if (!text) text = fallback;
+      if (maxLen > 0 && text.length > maxLen) {
+        text = text.slice(0, maxLen).trim();
+      }
+      if (!text) text = fallback;
+      return text;
+    }
+
+    function buildPixPayloadFromContext(ctx, amountCents) {
+      if (!ctx) return '';
+      const key = normalizePixKeyForPayload(ctx.key, ctx.type);
+      if (!key || key.length > 77) return '';
+
+      const merchantName = normalizePixMerchantText(ctx.merchantName, 25, 'MULTLINKS');
+      const merchantCity = normalizePixMerchantText(ctx.merchantCity, 15, 'SAO PAULO');
+      const merchantAccount = pixEmvField('00', 'br.gov.bcb.pix') + pixEmvField('01', key);
+
+      let payload = '';
+      payload += pixEmvField('00', '01');
+      payload += pixEmvField('26', merchantAccount);
+      payload += pixEmvField('52', '0000');
+      payload += pixEmvField('53', '986');
+      if (amountCents > 0) {
+        payload += pixEmvField('54', (amountCents / 100).toFixed(2));
+      }
+      payload += pixEmvField('58', 'BR');
+      payload += pixEmvField('59', merchantName);
+      payload += pixEmvField('60', merchantCity);
+      payload += pixEmvField('62', pixEmvField('05', '***'));
+      payload += '6304';
+
+      return payload + pixCrc16Ccitt(payload);
+    }
+
+    function pixFormatAmountCents(cents) {
+      if (!cents || cents < 0) return '';
+      return (cents / 100).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    }
+
+    function pixExtractAmountCents(inputValue) {
+      const digits = String(inputValue || '').replace(/\D+/g, '');
+      if (!digits) return 0;
+      return parseInt(digits, 10) || 0;
+    }
+
+    function setPixQrLoading(loading) {
+      const refs = getPixQrRefs();
+      if (!refs.area || !refs.loader) return;
+      refs.area.classList.toggle('is-loading', !!loading);
+      refs.loader.hidden = !loading;
+    }
+
+    async function loadPixQrFromPayload(payload) {
+      const refs = getPixQrRefs();
+      if (!refs.image) return;
+      const renderSequence = ++pixQrRenderSequence;
+      if (!payload) {
+        pixQrCurrentPayload = '';
+        refs.image.replaceChildren();
+        refs.image.classList.remove('has-qr-error');
+        setPixQrLoading(false);
+        if (refs.copyBtn) refs.copyBtn.disabled = true;
+        return;
+      }
+      pixQrCurrentPayload = payload;
+      if (refs.copyBtn) refs.copyBtn.disabled = false;
+      setPixQrLoading(true);
+      refs.image.setAttribute('aria-busy', 'true');
+      try {
+        await mlRenderWistagQr(
+          refs.image,
+          payload,
+          () => renderSequence === pixQrRenderSequence,
+        );
+      } catch (error) {
+        if (renderSequence === pixQrRenderSequence) {
+          mlShowQrError(refs.image);
+          console.error(error);
+        }
+      } finally {
+        if (renderSequence === pixQrRenderSequence) {
+          refs.image.setAttribute('aria-busy', 'false');
+          setPixQrLoading(false);
+        }
+      }
+    }
+
+    function resetPixQrCopyButtonLabel() {
+      const refs = getPixQrRefs();
+      if (!refs.copyBtn) return;
+      refs.copyBtn.textContent = pixQrCopyDefaultLabel;
+    }
+
+    function closePixQrModal() {
+      const refs = getPixQrRefs();
+      if (!refs.modal) return;
+      refs.modal.style.display = 'none';
+      if (refs.image) {
+        refs.image.replaceChildren();
+        refs.image.classList.remove('has-qr-error');
+      }
+      if (refs.amountInput) {
+        refs.amountInput.value = '';
+      }
+      if (pixQrDebounceTimer) {
+        clearTimeout(pixQrDebounceTimer);
+        pixQrDebounceTimer = null;
+      }
+      if (pixQrCopyResetTimer) {
+        clearTimeout(pixQrCopyResetTimer);
+        pixQrCopyResetTimer = null;
+      }
+      pixQrCurrentPayload = '';
+      pixQrCurrentContext = null;
+      pixQrRenderSequence += 1;
+      setPixQrLoading(false);
+      resetPixQrCopyButtonLabel();
+    }
+
+    window.mlOpenPixQrFromButton = function (btn) {
+      if (!btn || btn.disabled) return false;
+      const refs = getPixQrRefs();
+      if (!refs.modal || !refs.image) return false;
+
+      const basePayload = btn.getAttribute('data-pix-qr') || '';
+      const key = btn.getAttribute('data-pix-key') || basePayload;
+      const typeCode = btn.getAttribute('data-pix-type') || 'auto';
+      const merchantName = btn.getAttribute('data-pix-merchant-name') || 'MULTLINKS';
+      const merchantCity = btn.getAttribute('data-pix-merchant-city') || 'SAO PAULO';
+      const keyDisplay = (btn.getAttribute('data-pix-display') || '').trim();
+      const keyTypeCaption = (btn.getAttribute('data-pix-type-caption') || '').trim();
+
+      pixQrCurrentContext = {
+        basePayload: basePayload,
+        key: key,
+        type: typeCode,
+        merchantName: merchantName,
+        merchantCity: merchantCity,
+      };
+
+      if (refs.amountInput) {
+        refs.amountInput.value = '';
+      }
+
+      if (refs.title) {
+        const titleText = btn.getAttribute('data-pix-qr-title') || pixQrDefaultTitle;
+        refs.title.textContent = titleText;
+      }
+      if (refs.keyValue) {
+        refs.keyValue.textContent = keyDisplay;
+        refs.keyValue.style.display = keyDisplay !== '' ? 'block' : 'none';
+      }
+      if (refs.keyType) {
+        refs.keyType.textContent = keyTypeCaption;
+        refs.keyType.style.display = keyTypeCaption !== '' ? 'block' : 'none';
+      }
+
+      const payload = buildPixPayloadFromContext(pixQrCurrentContext, 0) || basePayload;
+      loadPixQrFromPayload(payload);
+      resetPixQrCopyButtonLabel();
+      refs.modal.style.display = 'flex';
+      return false;
+    };
+
+    document.addEventListener('input', (event) => {
+      const input = event.target;
+      if (!(input instanceof HTMLInputElement)) return;
+      if (input.id !== 'pix-qr-amount') return;
+      if (!pixQrCurrentContext) return;
+
+      const amountCents = pixExtractAmountCents(input.value);
+      input.value = pixFormatAmountCents(amountCents);
+      setPixQrLoading(true);
+
+      if (pixQrDebounceTimer) clearTimeout(pixQrDebounceTimer);
+      pixQrDebounceTimer = setTimeout(() => {
+        const nextPayload = buildPixPayloadFromContext(pixQrCurrentContext, amountCents) || (pixQrCurrentContext.basePayload || '');
+        loadPixQrFromPayload(nextPayload);
+      }, 520);
+    });
+
+    document.addEventListener('click', async (event) => {
+      const clickTarget = event.target;
+      if (!(clickTarget instanceof Element)) return;
+      if (clickTarget.closest('#btn-copy-pix-payload')) {
+        event.preventDefault();
+        const refs = getPixQrRefs();
+        if (!refs.copyBtn || !pixQrCurrentPayload) return;
+        const copied = await mlCopyText(pixQrCurrentPayload);
+        if (!copied) return;
+        refs.copyBtn.textContent = pixQrCopyDoneLabel;
+        if (pixQrCopyResetTimer) clearTimeout(pixQrCopyResetTimer);
+        pixQrCopyResetTimer = setTimeout(resetPixQrCopyButtonLabel, 1600);
+        return;
+      }
+      if (clickTarget.closest('#btn-close-pix-qr')) {
+        event.preventDefault();
+        closePixQrModal();
+        return;
+      }
+      if (clickTarget.id === 'pix-qr-modal') {
+        closePixQrModal();
+        return;
+      }
+      const btn = clickTarget.closest('.pix-qr-trigger[data-pix-qr]');
+      if (!btn) return;
+      if (btn.disabled) return;
+      event.preventDefault();
+      event.stopPropagation();
+      window.mlOpenPixQrFromButton(btn);
+    });
+	    document.addEventListener('keydown', (event) => {
+	      const refs = getPixQrRefs();
+	      if (event.key === 'Escape' && refs.modal && refs.modal.style.display === 'flex') {
+	        closePixQrModal();
+	      }
+	    });
+})();

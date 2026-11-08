@@ -1,0 +1,245 @@
+// Public link page: shared, cacheable behavior.
+(function () {
+  'use strict';
+  const cfg = JSON.parse(document.currentScript.dataset.config || '{}');
+(function(){
+  // Coleta todos os wrappers de Google
+  const wrappers = document.querySelectorAll('.gbtn-wrap');
+  if (!wrappers.length) return;
+
+  // Modal elements
+  const modal  = document.getElementById('gm-modal');
+  const box    = document.getElementById('gm-box');
+  const close  = document.getElementById('gm-close');
+  const stars  = document.querySelectorAll('.gm-star');
+  const negBox = document.getElementById('gm-neg');
+  const sendBtn= document.getElementById('gm-send');
+  const comment= document.getElementById('gm-comment');
+  const contactWrap2 = document.getElementById('gm-contact-wrap');
+  const contactInput2 = document.getElementById('gm-contact');
+  const status2 = document.getElementById('gm-status');
+  const aiToken = cfg.feedbackToken;
+  const pageId  = cfg.feedbackPageId;
+  const sourcePageId = cfg.pageId;
+  const defaultQuestion = cfg.how_was;
+  const defaultThanksTitle = cfg.thanks_title;
+  const defaultThanksText = cfg.thanks_text;
+  const sendLabel = cfg.send_feedback;
+  const sendingLabel = cfg.sending_feedback;
+  const chooseRatingText = cfg.feedback_choose_rating;
+  const errorText = cfg.feedback_error;
+  const retryText = cfg.feedback_retry_wait;
+
+  let currentUrl = null;
+  let threshold  = null;
+  let rating     = null;
+  let currentWrap = null;
+  let currentThanksTitle = defaultThanksTitle;
+  let currentThanksText = defaultThanksText;
+  let sendPending = false;
+  let submissionKey = createSubmissionKey();
+
+  function createSubmissionKey(){
+    if (window.crypto && typeof window.crypto.randomUUID === 'function') {
+      return window.crypto.randomUUID();
+    }
+    return 'ai-' + Date.now() + '-' + Math.random().toString(16).slice(2);
+  }
+
+  function setStatusMessage(text, isError){
+    if (!status2) return;
+    const msg = (text || '').trim();
+    status2.textContent = msg;
+    status2.style.display = msg ? 'block' : 'none';
+    status2.style.color = isError ? '#b91c1c' : '#166534';
+  }
+
+  function setSendBusy(busy){
+    sendPending = !!busy;
+    if (!sendBtn) return;
+    sendBtn.disabled = sendPending;
+    sendBtn.style.opacity = sendPending ? '0.72' : '1';
+    sendBtn.style.pointerEvents = sendPending ? 'none' : '';
+    sendBtn.setAttribute('aria-busy', sendPending ? 'true' : 'false');
+    sendBtn.textContent = sendPending ? sendingLabel : sendLabel;
+  }
+
+  function renderThanksModal(title, text){
+    modal.innerHTML = '';
+    const card = document.createElement('div');
+    card.className = 'modal';
+    card.style.textAlign = 'center';
+    card.style.padding = '30px';
+
+    const ttl = document.createElement('h3');
+    ttl.style.marginBottom = '14px';
+    ttl.textContent = title;
+
+    const body = document.createElement('p');
+    body.style.color = '#555';
+    body.textContent = text;
+
+    const ok = document.createElement('button');
+    ok.id = 'gm-ok';
+    ok.type = 'button';
+    ok.style.marginTop = '20px';
+    ok.style.padding = '10px 16px';
+    ok.style.border = 'none';
+    ok.style.borderRadius = '8px';
+    ok.style.background = '#22c55e';
+    ok.style.color = '#fff';
+    ok.style.fontWeight = '700';
+    ok.style.cursor = 'pointer';
+    ok.textContent = cfg.close;
+    ok.addEventListener('click', () => {
+      modal.style.display = 'none';
+      document.body.style.overflow = '';
+    });
+
+    card.appendChild(ttl);
+    card.appendChild(body);
+    card.appendChild(ok);
+    modal.appendChild(card);
+  }
+
+  function openModal(url, th){
+    currentUrl = url;
+    threshold  = (th === '' || th === null) ? null : Number(th);
+    rating     = null;
+    submissionKey = createSubmissionKey();
+    setStatusMessage('', false);
+    setSendBusy(false);
+    if (comment) comment.value = '';
+    if (contactInput2) contactInput2.value = '';
+    if (contactWrap2) contactWrap2.style.display = 'none';
+    // reset UI
+    stars.forEach(s => {
+      s.classList.remove('selected', 'filled');
+      const icon = s.querySelector('i');
+      if (icon) { icon.classList.add('fa-regular'); icon.classList.remove('fa-solid'); }
+    });
+    negBox.classList.remove('gm-open');
+    modal.style.display = 'flex';
+    document.body.style.overflow = 'hidden';
+  }
+  function closeModal(){
+    modal.style.display = 'none';
+    document.body.style.overflow = '';
+  }
+
+  close && close.addEventListener('click', closeModal);
+  if (comment) {
+    comment.addEventListener('input', () => {
+      if (contactWrap2 && comment.value.trim().length > 0) {
+        contactWrap2.style.display = 'block';
+      }
+    });
+  }
+
+  wrappers.forEach(wrap => {
+    // target: qualquer <a> dentro do wrapper
+    const a = wrap.querySelector('a[href]');
+    wrap._btnTitle = wrap.getAttribute('data-btn-title') || null;
+    wrap._btnUid = wrap.getAttribute('data-btn-uid') || null;
+    if (!a) return;
+    a.addEventListener('click', (e) => {
+      const enabled = wrap.getAttribute('data-rf-enabled') === '1';
+      const th = wrap.getAttribute('data-rf-threshold');
+      if (!enabled || !th) return; // sem filtro, segue o padrão
+
+      e.preventDefault();
+      currentWrap = wrap;
+      const titleEl = document.getElementById('gm-title');
+      const question = wrap.getAttribute('data-rf-question') || defaultQuestion;
+      if (titleEl) titleEl.textContent = question;
+      currentThanksTitle = wrap.getAttribute('data-rf-thanks-title') || defaultThanksTitle;
+      currentThanksText = wrap.getAttribute('data-rf-thanks-text') || defaultThanksText;
+      openModal(a.getAttribute('href') || wrap.getAttribute('data-google-url') || '#', th);
+    });
+  });
+
+  // Escolha de estrelas
+  stars.forEach(btn => {
+    btn.addEventListener('click', () => {
+      rating = Number(btn.dataset.value || 0);
+      setStatusMessage('', false);
+      // Marcação cumulativa: até a nota clicada fica "filled" (amarelo)
+      stars.forEach(s => {
+        const val = Number(s.dataset.value || 0);
+        const filled = val <= rating;
+        s.classList.toggle('filled', filled);
+        s.classList.toggle('selected', s === btn);
+        const icon = s.querySelector('i');
+        if (icon) {
+          if (filled) {
+            icon.classList.remove('fa-regular');
+            icon.classList.add('fa-solid');
+          } else {
+            icon.classList.add('fa-regular');
+            icon.classList.remove('fa-solid');
+          }
+        }
+      });
+      // Mostrar feedback interno se dentro do threshold
+      if (threshold && rating && rating <= threshold) {
+        negBox.classList.add('gm-open');
+      } else {
+        negBox.classList.remove('gm-open');
+        // Fora do threshold: vai direto ao Google (mesma aba)
+        if (currentUrl) window.location.href = currentUrl;
+      }
+    });
+  });
+
+  // Enviar feedback interno
+  sendBtn && sendBtn.addEventListener('click', async () => {
+    if (sendPending) return;
+    if (!rating) {
+      setStatusMessage(chooseRatingText, true);
+      return;
+    }
+    setStatusMessage('', false);
+    setSendBusy(true);
+
+    try {
+      const fd = new FormData();
+      fd.append('ai_action', 'create');
+      fd.append('page_id', pageId);
+      fd.append('source_page_id', sourcePageId);
+      if (currentWrap && currentWrap._btnTitle) fd.append('button_title', currentWrap._btnTitle);
+      if (currentWrap && currentWrap._btnUid) fd.append('button_uid', currentWrap._btnUid);
+      fd.append('rating', rating || '');
+      fd.append('comment', (comment.value || '').trim());
+      fd.append('ai_token', aiToken);
+      fd.append('submission_key', submissionKey);
+      fd.append('website', ''); // honeypot
+      if (contactInput2 && contactInput2.value) { fd.append('contact', contactInput2.value.trim()); }
+
+      const response = await fetch(window.location.href, {
+        method: 'POST',
+        body: fd,
+        credentials: 'same-origin'
+      });
+      let data = null;
+      try {
+        data = await response.json();
+      } catch (_) {}
+      if (!response.ok || !data || data.ok !== true) {
+        const code = data && data.error ? data.error : '';
+        throw new Error(code || 'request_failed');
+      }
+    } catch (err) {
+      const code = err && err.message ? err.message : '';
+      setStatusMessage((code === 'too_many_requests' || code === 'rate_limited') ? retryText : errorText, true);
+      setSendBusy(false);
+      submissionKey = createSubmissionKey();
+      return;
+    }
+
+    // Exibir mensagem de agradecimento
+    const thanksTitle = currentThanksTitle || defaultThanksTitle;
+    const thanksText = currentThanksText || defaultThanksText;
+    renderThanksModal(thanksTitle, thanksText);
+  });
+})();
+})();

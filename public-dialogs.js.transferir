@@ -1,0 +1,100 @@
+// Shared keyboard behavior for the public page's existing modal windows.
+(function () {
+  'use strict';
+  const overlays = Array.from(document.querySelectorAll('.modal-overlay, .produto-lightbox'));
+  if (!overlays.length) return;
+  let active = null;
+  let returnFocus = null;
+  let lastOutsideFocus = document.activeElement;
+  let background = [];
+  const focusable = 'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
+  const visible = (el) => el && el.isConnected && (el.classList.contains('produto-lightbox')
+    ? el.classList.contains('is-visible')
+    : getComputedStyle(el).display !== 'none' && getComputedStyle(el).visibility !== 'hidden');
+  const controls = (overlay) => Array.from(overlay.querySelectorAll(focusable)).filter((el) => el.getClientRects().length && !el.closest('[inert]'));
+
+  function focusFirst() {
+    if (!active) return;
+    const dialog = active.querySelector('[role="dialog"], .modal, .produto-lightbox-dialog') || active;
+    dialog.setAttribute('role', 'dialog');
+    dialog.setAttribute('aria-modal', 'true');
+    dialog.setAttribute('tabindex', '-1');
+    const target = controls(active)[0] || dialog;
+    target.focus({preventScroll: true});
+  }
+
+  function restoreBackground() {
+    background.forEach(([element, inert]) => { element.inert = inert; });
+    background = [];
+  }
+
+  function update() {
+    const next = overlays.find(visible) || null;
+    if (next === active) {
+      if (active && !active.contains(document.activeElement)) focusFirst();
+      return;
+    }
+    const previous = active;
+    restoreBackground();
+    active = next;
+    if (active) {
+      returnFocus = lastOutsideFocus;
+      for (const element of document.body.children) {
+        if (element === active || element.contains(active) || /^(SCRIPT|STYLE|LINK)$/.test(element.tagName)) continue;
+        background.push([element, element.inert]);
+        element.inert = true;
+      }
+      active.setAttribute('aria-hidden', 'false');
+      focusFirst();
+      // CSS visibility transitions may not be focusable until the next painted frame.
+      let focusAttempts = 0;
+      const settleFocus = () => {
+        if (active !== next || active.contains(document.activeElement)) return;
+        focusFirst();
+        if (++focusAttempts < 15 && !active.contains(document.activeElement)) requestAnimationFrame(settleFocus);
+      };
+      requestAnimationFrame(settleFocus);
+    } else if (previous) {
+      previous.setAttribute('aria-hidden', 'true');
+      if (returnFocus && returnFocus.isConnected && typeof returnFocus.focus === 'function') {
+        returnFocus.focus({preventScroll: true});
+      }
+      returnFocus = null;
+    }
+  }
+
+  document.addEventListener('focusin', (event) => {
+    if (active && !active.contains(event.target)) {
+      focusFirst();
+    } else if (!overlays.some((overlay) => overlay.contains(event.target))) {
+      lastOutsideFocus = event.target;
+    }
+  });
+  document.addEventListener('click', (event) => {
+    if (!active) {
+      const trigger = event.target.closest('a, button, [tabindex]');
+      if (trigger && !overlays.some((overlay) => overlay.contains(trigger))) lastOutsideFocus = trigger;
+    }
+  }, true);
+  document.addEventListener('keydown', (event) => {
+    if (!active) return;
+    if (event.key === 'Tab') {
+      const items = controls(active);
+      const first = items[0], last = items[items.length - 1];
+      if (!first || (event.shiftKey && (document.activeElement === first || !items.includes(document.activeElement))) || (!event.shiftKey && (document.activeElement === last || !items.includes(document.activeElement)))) {
+        event.preventDefault();
+        (event.shiftKey ? last : first)?.focus();
+        if (!first) focusFirst();
+      }
+    } else if (event.key === 'Escape') {
+      const close = active.querySelector('.close, .produto-lightbox-close, #gm-ok');
+      if (close) { event.preventDefault(); close.click(); }
+    }
+  });
+  const observer = new MutationObserver(update);
+  overlays.forEach((overlay) => {
+    observer.observe(overlay, {attributes: true, attributeFilter: ['style', 'class', 'aria-hidden'], childList: true});
+    if (!visible(overlay)) overlay.setAttribute('aria-hidden', 'true');
+  });
+  update();
+})();
