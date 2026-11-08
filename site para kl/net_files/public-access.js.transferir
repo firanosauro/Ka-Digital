@@ -1,0 +1,33 @@
+// Public link page: shared, cacheable behavior.
+(function () {
+  'use strict';
+  const cfg = JSON.parse(document.currentScript.dataset.config || '{}');
+(function () {
+      var btn = document.getElementById('floating-edit-page');
+      if (!btn) return;
+      var apiUrl = cfg.accessUrl;
+      if (!apiUrl) return;
+
+      function checkAccess() {
+        fetch(apiUrl, { method: 'GET', credentials: 'include' })
+          .then(function (res) {
+            if (!res.ok) return null;
+            return res.json();
+          })
+          .then(function (data) {
+            if (!data || !data.allowed) return;
+            if (data.edit_url) {
+              btn.href = data.edit_url;
+            }
+            btn.style.display = 'inline-flex';
+          })
+          .catch(function () {
+            // Falha silenciosa: apenas mantém botão oculto.
+          });
+      }
+
+      window.addEventListener('load', function () {
+        window.setTimeout(checkAccess, 1200);
+      }, { once: true });
+    })();
+})();

@@ -1,0 +1,124 @@
+// Public link page: shared, cacheable behavior.
+(function () {
+  'use strict';
+  const cfg = JSON.parse(document.currentScript.dataset.config || '{}');
+const wistagQrAssetUrls = Object.freeze({
+      matrix: cfg.qrMatrixUrl,
+      renderer: cfg.qrRendererUrl,
+    });
+    const wistagQrErrorLabel = cfg.qr_generation_error;
+    let wistagQrEnginePromise = null;
+
+    function mlLoadQrScript(src) {
+      return new Promise((resolve, reject) => {
+        const script = document.createElement('script');
+        script.src = src;
+        script.async = true;
+        script.addEventListener('load', resolve, { once: true });
+        script.addEventListener('error', () => {
+          script.remove();
+          reject(new Error('Falha ao carregar o gerador de QR Code.'));
+        }, { once: true });
+        document.head.appendChild(script);
+      });
+    }
+
+    function mlEnsureWistagQrEngine() {
+      if (typeof window.qrcode === 'function' && window.WistagRoundedQr) {
+        return Promise.resolve(window.WistagRoundedQr);
+      }
+      if (!wistagQrEnginePromise) {
+        wistagQrEnginePromise = Promise.all([
+          mlLoadQrScript(wistagQrAssetUrls.matrix),
+          mlLoadQrScript(wistagQrAssetUrls.renderer),
+        ])
+          .then(() => {
+            if (!window.WistagRoundedQr) throw new Error('Gerador de QR Code indisponível.');
+            return window.WistagRoundedQr;
+          })
+          .catch((error) => {
+            wistagQrEnginePromise = null;
+            throw error;
+          });
+      }
+      return wistagQrEnginePromise;
+    }
+
+    async function mlRenderWistagQr(target, payload, shouldRender) {
+      const engine = await mlEnsureWistagQrEngine();
+      if (typeof shouldRender === 'function' && !shouldRender()) return null;
+      return engine.render(target, payload, {
+        size: 320,
+        errorLevel: 'H',
+        quietZone: 4,
+      });
+    }
+
+    function mlShowQrError(target) {
+      if (!target) return;
+      target.textContent = wistagQrErrorLabel;
+      target.classList.add('has-qr-error');
+    }
+
+    // Cópia para data-pix / data-wifi
+    async function mlCopyText(text) {
+      try {
+        await navigator.clipboard.writeText(text);
+        return true;
+      } catch (_) {
+        try {
+          const input = document.createElement('textarea');
+          input.value = text;
+          input.setAttribute('readonly', '');
+          input.style.position = 'fixed';
+          input.style.opacity = '0';
+          document.body.appendChild(input);
+          input.select();
+          const ok = document.execCommand('copy');
+          input.remove();
+          return !!ok;
+        } catch (_) {
+          return false;
+        }
+      }
+    }
+
+    document.querySelectorAll('[data-pix], [data-wifi]').forEach(btn => {
+      const content = btn.querySelector('.btn__content');
+      const originalButtonHtml = btn.innerHTML;
+      const originalContentHtml = content ? content.innerHTML : '';
+      let resetTimer = null;
+
+      btn.addEventListener('click', async () => {
+        const key = btn.dataset.pix || btn.dataset.wifi || '';
+        if (!key) return;
+
+        const copied = await mlCopyText(key);
+        if (!copied) return;
+
+        const feedbackLabel = cfg.share_copied;
+        btn.classList.add('is-copied');
+
+        if (content) {
+          const icon = content.querySelector('img, i');
+          const iconHtml = icon ? icon.outerHTML + ' ' : '';
+          content.innerHTML = iconHtml + '<span class="btn__feedback-label">' + feedbackLabel + '</span>';
+        } else {
+          btn.textContent = feedbackLabel;
+        }
+
+        if (resetTimer) clearTimeout(resetTimer);
+        resetTimer = setTimeout(() => {
+          btn.classList.remove('is-copied');
+          if (content) {
+            content.innerHTML = originalContentHtml;
+          } else {
+            btn.innerHTML = originalButtonHtml;
+          }
+        }, 1800);
+      });
+    });
+
+
+Object.assign(window, {mlRenderWistagQr, mlShowQrError, mlCopyText});
+})();

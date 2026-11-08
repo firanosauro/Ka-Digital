@@ -1,0 +1,113 @@
+// Public link page: shared, cacheable behavior.
+(function () {
+  'use strict';
+  const cfg = JSON.parse(document.currentScript.dataset.config || '{}');
+const wifiQrDefaultTitle = cfg.wifi_qr_modal_title;
+const wifiQrNetworkLabel = cfg.wifi_rede;
+const wifiQrPasswordLabel = cfg.wifi_password;
+let wifiQrRenderSequence = 0;
+
+function getWifiQrRefs() {
+  return {
+    modal: document.getElementById('wifi-qr-modal'),
+    image: document.getElementById('wifi-qr-image'),
+    title: document.getElementById('wifi-qr-title'),
+    area: document.querySelector('#wifi-qr-modal .pix-qr-area'),
+    loader: document.getElementById('wifi-qr-loader'),
+    ssid: document.getElementById('wifi-qr-ssid'),
+    password: document.getElementById('wifi-qr-password'),
+  };
+}
+
+function setWifiQrLoading(loading) {
+  const refs = getWifiQrRefs();
+  if (!refs.area || !refs.loader) return;
+  refs.area.classList.toggle('is-loading', !!loading);
+  refs.loader.hidden = !loading;
+}
+
+function closeWifiQrModal() {
+  const refs = getWifiQrRefs();
+  if (!refs.modal) return;
+  refs.modal.style.display = 'none';
+  if (refs.image) {
+    refs.image.replaceChildren();
+    refs.image.classList.remove('has-qr-error');
+  }
+  wifiQrRenderSequence += 1;
+  setWifiQrLoading(false);
+}
+
+window.mlOpenWifiQrFromButton = async function (btn) {
+  if (!btn || btn.disabled) return false;
+  const refs = getWifiQrRefs();
+  if (!refs.modal || !refs.image) return false;
+
+  const payload = btn.getAttribute('data-wifi-qr') || '';
+  if (!payload) return false;
+  const ssid = btn.getAttribute('data-wifi-ssid') || '';
+  const password = btn.getAttribute('data-wifi-password') || '';
+  const showPassword = btn.getAttribute('data-wifi-show-password') === '1';
+
+  if (refs.title) {
+    refs.title.textContent = btn.getAttribute('data-wifi-qr-title') || wifiQrDefaultTitle;
+  }
+  if (refs.ssid) {
+    refs.ssid.textContent = ssid ? wifiQrNetworkLabel + ': ' + ssid : '';
+    refs.ssid.style.display = ssid ? 'block' : 'none';
+  }
+  if (refs.password) {
+    refs.password.textContent = showPassword && password ? wifiQrPasswordLabel + ': ' + password : '';
+    refs.password.style.display = showPassword && password ? 'block' : 'none';
+  }
+
+  refs.modal.style.display = 'flex';
+  const renderSequence = ++wifiQrRenderSequence;
+  setWifiQrLoading(true);
+  refs.image.setAttribute('aria-busy', 'true');
+  try {
+    await mlRenderWistagQr(
+      refs.image,
+      payload,
+      () => renderSequence === wifiQrRenderSequence,
+    );
+  } catch (error) {
+    if (renderSequence === wifiQrRenderSequence) {
+      mlShowQrError(refs.image);
+      console.error(error);
+    }
+  } finally {
+    if (renderSequence === wifiQrRenderSequence) {
+      refs.image.setAttribute('aria-busy', 'false');
+      setWifiQrLoading(false);
+    }
+  }
+  return false;
+};
+
+document.addEventListener('click', (event) => {
+  const clickTarget = event.target;
+  if (!(clickTarget instanceof Element)) return;
+  if (clickTarget.closest('#btn-close-wifi-qr')) {
+    event.preventDefault();
+    closeWifiQrModal();
+    return;
+  }
+  if (clickTarget.id === 'wifi-qr-modal') {
+    closeWifiQrModal();
+    return;
+  }
+  const btn = clickTarget.closest('.wifi-qr-trigger[data-wifi-qr]');
+  if (!btn || btn.disabled) return;
+  event.preventDefault();
+  event.stopPropagation();
+  window.mlOpenWifiQrFromButton(btn);
+});
+
+document.addEventListener('keydown', (event) => {
+  const refs = getWifiQrRefs();
+  if (event.key === 'Escape' && refs.modal && refs.modal.style.display === 'flex') {
+    closeWifiQrModal();
+  }
+});
+})();
